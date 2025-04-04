@@ -10,7 +10,7 @@ from torch import nn
 from tqdm import trange
 
 from .camera import to_viewpoint_camera
-from .metric import calc_psnr
+from .metric import calc_psnr, calc_ssim
 from .render import GaussRenderer
 
 
@@ -63,18 +63,22 @@ class Trainer:
         # TODO: Compute L1 Loss
         # Hint: L1 loss measures absolute pixel-wise differences between the rendered image and ground truth.
         # l1_loss = ...
+        l1_loss = nn.L1Loss(rgb, output['render'])
     
         # TODO: Compute DSSIM Loss
         # Hint: DSSIM loss is derived from SSIM, a perceptual loss that compares structure, contrast, and luminance.
         # dssim_loss = ...
+        dssim_loss = 0.5 * (1 - calc_ssim(output['render'], rgb))
     
         # TODO: Compute Depth Loss
         # Hint: Compute depth error only where valid (using the mask).
         # depth_loss = ...
+        depth_loss = nn.MSELoss()(output['depth'][mask], depth[mask])
     
         # TODO: Compute Total Loss
         # Hint: Combine all losses using respective weighting coefficients.
         # total_loss = ...
+        total_loss = self.l1_weight * l1_loss + self.dssim_weight * dssim_loss + self.depth_weight * depth_loss
     
         total_loss.backward()
         self.optimizer.step()

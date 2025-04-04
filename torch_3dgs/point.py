@@ -5,9 +5,10 @@ import numpy as np
 import torch
 
 from  .camera import extract_camera_params
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
-
-def get_point_clouds(cameras, depths, alphas, rgbs=None):
+def get_point_clouds(cameras, depths, alphas, rgbs=None, visualize=False):
     """
     Generates a 3D point cloud from camera parameters, depth maps, and optional RGB colors.
 
@@ -31,15 +32,43 @@ def get_point_clouds(cameras, depths, alphas, rgbs=None):
     # to convert pixel coordinates into world-space rays.
     # rays_o, rays_d = ......
 
+    # focals, and centers
+    fx, fy, cx, cy = intrinsics[:, 0, 0], intrinsics[:, 1, 1], intrinsics[:, 0, 2], intrinsics[:, 1, 2]
+    # Rotation and translation of the cameras
+    R, t = c2ws[:, :3, :3], c2ws[:, :3, 3]
+
+    u, v = torch.meshgrid(torch.arange(W), torch.arange(H), indexing="xy")
+    u, v = u.flatten(), v.flatten()
+    u = u.unsqueeze(0).expand(depths.shape[0], -1).to('cuda')  # (B, HW)
+    v = v.unsqueeze(0).expand(depths.shape[0], -1).to('cuda')
+
+    x_c = (u - cx.unsqueeze(-1)) / fx.unsqueeze(-1)
+    y_c = (v - cy.unsqueeze(-1)) / fy.unsqueeze(-1)
+    z_c = torch.ones_like(x_c)
+
+    rays_d_camera = torch.stack([x_c, y_c, z_c], dim=-1)
+    rays_d_camera = rays_d_camera / torch.norm(rays_d_camera, dim=-1, keepdim=True)  # Normalize
+    rays_d = torch.matmul(R.unsqueeze(1).expand(-1,rays_d_camera.shape[1], -1, -1), rays_d_camera.unsqueeze(-1)).squeeze(-1)
+    rays_o = t.unsqueeze(1).expand_as(rays_d)
+
     # TODO: Compute 3D world coordinates using depth values
     # Hint: Use the ray equation: P = O + D * depth
     # P: 3D point, O: ray origin, D: ray direction, depth: depth value
     # pts = ......
+    depths = depths.flatten(1).unsqueeze(-1)
+    pts = rays_o + rays_d * depths
 
     # TODO: Apply the alpha mask to filter valid points
     # Hint: Mask should be applied to both coordinates and RGB values (if provided)
     # mask = ......
     # coords = pts[mask].cpu().numpy()
+    mask = (alphas > 0)
+    mask = mask.flatten(1)
+    coords = pts[mask]
+    coords = coords.cpu().numpy()
+    rgbas = rgbs.flatten(1, 2)[mask].cpu().numpy()
+    alphas = np.ones((rgbas.shape[0], 1), dtype=np.float32)
+    rgbas = np.concatenate([rgbas, alphas], axis=-1)
 
     if rgbs is not None:
         channels = dict(
@@ -52,6 +81,36 @@ def get_point_clouds(cameras, depths, alphas, rgbs=None):
         channels = {}
 
     point_cloud = PointCloud(coords, channels)
+
+    if visualize:
+        print("Start Rendering point cloud")
+        # Visualize 3D point cloud with matplotlib
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Plot the points with RGB colors
+        indices = np.random.choice(coords.shape[0], 100000, replace=False)
+        ax.scatter(coords[indices, 0], coords[indices, 1], coords[indices, 2], c=rgbas[indices], marker='o', s=1)
+
+        # Set labels and title
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title("3D Point Cloud Visualization")
+
+        # Set view angle for a good perspective
+        ax.view_init(elev=30, azim=45)  # Change these to adjust the viewpoint
+
+        x_range = [-2, 2]
+        y_range = [-2, 2]
+        z_range = [-2, 2]
+
+        ax.set_xlim(x_range)
+        ax.set_ylim(y_range)
+        ax.set_zlim(z_range)
+
+        plt.savefig('./point_cloud.png')
+
     return point_cloud
 
 

@@ -18,3 +18,4 @@ dependencies:
       - omegaconf
       - plotly
       - wandb
+      - plyfile
