@@ -63,7 +63,7 @@ class Trainer:
         # TODO: Compute L1 Loss
         # Hint: L1 loss measures absolute pixel-wise differences between the rendered image and ground truth.
         # l1_loss = ...
-        l1_loss = nn.L1Loss(rgb, output['render'])
+        l1_loss = nn.L1Loss()(output['render'], rgb)
     
         # TODO: Compute DSSIM Loss
         # Hint: DSSIM loss is derived from SSIM, a perceptual loss that compares structure, contrast, and luminance.
@@ -73,7 +73,7 @@ class Trainer:
         # TODO: Compute Depth Loss
         # Hint: Compute depth error only where valid (using the mask).
         # depth_loss = ...
-        depth_loss = nn.MSELoss()(output['depth'][mask], depth[mask])
+        depth_loss = nn.MSELoss()(output['depth'][mask], depth[mask].unsqueeze(-1))
     
         # TODO: Compute Total Loss
         # Hint: Combine all losses using respective weighting coefficients.

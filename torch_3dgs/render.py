@@ -145,7 +145,15 @@ class GaussRenderer(nn.Module):
         return (color + 0.5).clamp(min=0.0)
 
     def render(self, camera, means2D, cov2d, color, opacity, depths):
+        # min_num_gaussians = min([means2D.shape[0], cov2d.shape[0], color.shape[0], opacity.shape[0], depths.shape[0]])
+        # means2D = means2D[:min_num_gaussians, ...]
+        # cov2d = cov2d[:min_num_gaussians, ...]
+        # color = color[:min_num_gaussians, ...]
+        # opacity = opacity[:min_num_gaussians, ...]
+        # depths = depths[:min_num_gaussians, ...]
+
         radii = get_radius(cov2d)
+
         rect_min, rect_max = get_rect(means2D, radii, camera.image_width, camera.image_height)
 
         if self.pix_coord is None:
@@ -181,7 +189,7 @@ class GaussRenderer(nn.Module):
                 # TODO: Sort Gaussians by depth.
                 # Hint: Sorting should be based on the depth values of Gaussians.
                 # sorted_depths, index = ...
-                sorted_depths, index = torch.sort(depths[in_mask], descending=True)
+                sorted_depths, index = torch.sort(depths[in_mask], descending=False)
 
                 # TODO: Extract relevant Gaussian properties for the tile.
                 # Hint: Use the computed index to rearrange the following tensors.
@@ -223,15 +231,6 @@ class GaussRenderer(nn.Module):
                 ], dim=1)
                 alpha_composit = T * alpha
                 acc_alpha = alpha_composit.sum(dim=1)
-                
-
-                # for i in range(sorted_means2D.shape[0]):
-                #     alpha = gauss_weight[i] * sorted_opacity[i]  # Alpha for this Gaussian at each pixel
-                #     delta = T * alpha  # Contribution factor
-                #     acc_color += delta[:, None] * sorted_color[i]
-                #     acc_depth += delta * sorted_depths[i]
-                #     acc_alpha += delta
-                #     T *= (1 - alpha)
     
                 # TODO: Compute the color and depth contributions.
                 # Hint: Perform weighted summation using computed transmittance and opacity.
@@ -264,8 +263,8 @@ class GaussRenderer(nn.Module):
     def forward(self, camera, pc):
         mean_ndc, mean_view, in_mask = projection_ndc(pc.xyz, camera.world_to_view, camera.projection)
         assert in_mask.any(), "No points in frustum"
-        mean_ndc = mean_ndc[in_mask]
-        mean_view = mean_view[in_mask]
+        # mean_ndc = mean_ndc[in_mask]
+        # mean_view = mean_view[in_mask]
         depths = mean_view[:, 2]
 
         color = self.build_color(pc.xyz, pc.features, camera)

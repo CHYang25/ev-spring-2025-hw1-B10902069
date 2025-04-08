@@ -19,11 +19,20 @@ if __name__ == "__main__":
     data = read_data(config.data_folder, resize_scale=config.resize_scale)
     data = dict_to_device(data, device)
 
+    data_size = data['camera'].shape[0]
+    assert data_size >= config.num_training_data
+
+    data_indices = list(range(0, data_size, data_size // config.num_training_data))
+
+    if len(data_indices) < config.num_training_data:
+        assert config.num_training_data == len(data_indices) + 1
+        data_indices.append(data_size - 1)
+
     points = get_point_clouds(
-        data["camera"],
-        data["depth"],
-        data["alpha"],
-        data["rgb"],
+        data["camera"][data_indices],
+        data["depth"][data_indices],
+        data["alpha"][data_indices],
+        data["rgb"][data_indices],
     )
     raw_points = points.random_sample(config.num_points)
     model = GaussianModel(sh_degree=4, debug=False)

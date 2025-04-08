@@ -30,6 +30,6 @@ def compute_mean_knn_dist(points: torch.Tensor, k: int = 3) -> torch.Tensor:
     # TODO: Compute the mean k-NN distance
     # Hint: Average the distances over the k neighbors
     # mean_knn_dist = ......
-    mean_knn_dist = torch.sqrt(knn_vals.float().mean(dim=-1)) 
+    mean_knn_dist = knn_vals.float().mean(dim=-1)
     
     return mean_knn_dist
